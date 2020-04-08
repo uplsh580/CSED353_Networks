@@ -8,9 +8,9 @@ timeout = 1 # in second
 
 # Create UDP client socket
 # Note the use of SOCK_DGRAM for UDP datagram packet
-clientsocket = ### Write your code
+clientsocket = socket(AF_INET, SOCK_DGRAM)### Write your code
 # Set socket timeout as 1 second
-### Write your code
+clientsocket.settimeout(timeout)### Write your code
 # Command line argument is a string, change the port into integer
 port = int(port)  
 # Sequence number of the ping message
@@ -26,13 +26,13 @@ while ptime < 10:
 	# Sent time
 		RTTb = time.time()
 	# Send the UDP packet with the ping message
-		### Write your code
+		clientsocket.sendto("ping", (host, port))### Write your code
 	# Receive the server response
-		message, address = ### Write your code
+		message, address = clientsocket.recvfrom(2048)### Write your code
 	# Received time
 		RTTa = time.time()
 	# Display the server response as an output
-		print("Reply from " + address[0] + ": " +  ### Write your code )
+		print("Reply from " + address[0] + ": " + message) ### Write your code )
 	# Round trip time is the difference between sent and received time
 		print("RTT: " + str(RTTa - RTTb))
 	except:
@@ -42,5 +42,5 @@ while ptime < 10:
 		continue
 
 # Close the client socket
-### Write your code
+clientsocket.close()### Write your code
 
