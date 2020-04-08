@@ -37,32 +37,27 @@ while True:
 		filename = message.split()[1]### Write your code
 		# Because the extracted path of the HTTP request includes 
 		# a character '\', we read the path from the second character 
-		print("Request file name :", filename)
 		f = open(filename[1:])
 		# Store the entire content of the requested file in a temporary buffer
 		outputdata = f.read()
 		# Send the HTTP response header line to the connection socket
-		### Write your code
-		response_hd = "HTTP/1.1 200 OK\r\n\r\n"
-		print(response_hd)
-		connectionSocket.send(response_hd)
+		connectionSocket.send("HTTP/1.1 200 OK\r\n\r\n".encode()) ### Write your code
 		# Send the content of the requested file to the connection socket
 		for i in range(0, len(outputdata)):  
-			connectionSocket.send(outputdata[i])### Write your code
+			connectionSocket.send(outputdata[i].encode())### Write your code
 		# Send "\r\n" to the connection socket.
-		connectionSocket.send("\r\n") ### Write your code
+		connectionSocket.send("\r\n".encode()) ### Write your code
 		# Close the client connection socket
 		connectionSocket.close() ### Write your code
 		
 	except IOError:
 		print("IOError")
 		# Send HTTP response message for file not found
-		connectionSocket.send("HTTP/1.1 404 Not Found\r\n\r\n")
-		connectionSocket.send("HTTP 404 Not Found\r\n")
-		### Write your code
+		connectionSocket.send("HTTP/1.1 404 Not Found\r\n\r\n".encode())### Write your code
+		connectionSocket.send("HTTP 404 Not Found\r\n".encode())### Write your code
 		# Close the client connection socket
 		connectionSocket.close() ### Write your code
 
 # Close the server socket
-serverSocket.close()
+serverSocket.close() ### Write your code
 sys.exit() #Terminate the program after sending the corresponding data
