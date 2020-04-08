@@ -26,13 +26,13 @@ while ptime < 10:
 	# Sent time
 		RTTb = time.time()
 	# Send the UDP packet with the ping message
-		clientsocket.sendto("ping", (host, port))### Write your code
+		clientsocket.sendto("ping".encode(), (host, port))### Write your code
 	# Receive the server response
-		message, address = clientsocket.recvfrom(2048)### Write your code
+		message, address = clientsocket.recvfrom(65565)### Write your code
 	# Received time
 		RTTa = time.time()
 	# Display the server response as an output
-		print("Reply from " + address[0] + ": " + message) ### Write your code )
+		print("Reply from " + address[0] + ": " + message.decode()) ### Write your code )
 	# Round trip time is the difference between sent and received time
 		print("RTT: " + str(RTTa - RTTb))
 	except:
