@@ -3,6 +3,9 @@ from socket import *
 import sys
 import os
 from cmd import Cmd
+import subprocess
+import sys
+import time
 
 #Connect Info valuable
 connect_username = None
@@ -16,6 +19,18 @@ local_cur_location = os.path.abspath('./')
 parser = argparse.ArgumentParser()
 parser.add_argument("server", help="connect server ip : 'username@addrhostnameess'", type=str)
 parser.add_argument("-p", "--port", help="connect server port, default is 22", type=int, default=22)
+
+def package_install(package):
+    while (1):
+        print("This program needs [{}] package.".format(package))
+        reply = input("Is it okay to install [{}] package? (y/n) : ".format(package))
+        if reply == 'y':
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+            time.sleep(1)
+            return True
+        elif reply == 'n':
+            print("Quit program.")
+            exit()
 
 def abs_path(input_path = ""):
     global local_cur_location
@@ -33,7 +48,6 @@ def parse(arg):
 class Prompt_sftp(Cmd):
     intro = "Welcome! sftp!"
     prompt = 'custom_sftp> '
-
     
     def do_lls(self, args=""):
         flag = ""
@@ -87,21 +101,28 @@ def print_connect_info():
 
 
 if __name__ == "__main__":
-    #Start sftp
+    #Check paramiko package
+    try:
+        import paramiko
+    except ImportError as e:
+        os.system('clear')
+        package_install("paramiko")
+
+    #Start Program
     os.system('clear')
     arges = parser.parse_args()
-    #Update connect info from parser
     connect_username, connect_hostname = server_arg_check(arges.server)
     connect_hostport = arges.port
-    #print connect info
+
     print("Hello~!. sftp excute.")
     print_connect_info()
 
-    # Establish a TCP connection with a server 
+    # #Establish a TCP connection with a server 
     # try:
     #     clientSocket = socket(AF_INET, SOCK_STREAM)
     #     clientSocket.connect((connect_hostname, connect_hostport))
 
     # except :
     #     print("[Custom_Error_35301] : {}:{} Connect Failed".format(connect_hostname, connect_hostport))
+
     Prompt_sftp().cmdloop()
