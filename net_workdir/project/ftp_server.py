@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import time
+import os
 
 def package_install(package):
     while (1):
@@ -9,6 +10,7 @@ def package_install(package):
         if reply == 'y':
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
             time.sleep(1)
+
             return True
         elif reply == 'n':
             print("Quit program.")
@@ -21,3 +23,4 @@ if __name__ == "__main__":
     except ImportError as e:
         os.system('clear')
         package_install("paramiko")
+        os.system('clear')
