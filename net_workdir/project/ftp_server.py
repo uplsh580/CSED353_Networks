@@ -8,6 +8,7 @@ import traceback
 
 import paramiko
 from paramiko.py3compat import b, u, decodebytes
+from threading import Thread
 
 
 # setup logging
@@ -93,34 +94,19 @@ def request_handler(recv_mssg):
     else :
         return "wow"
 
-def main():
-    DoGSSAPIKeyExchange = True
+class Client_Thread(Thread):
+    def __init__(self, host, port, sock):
+        Thread.__init__(self)
+        self.host = host
+        self.port = port
+        self.sock = sock
+        print ("(Check the new thread) "+host+":"+str(port))
 
-    # now connect
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("", 2200))
-        sock.listen(100)
-        print("Listening for connection ...")
-    except Exception as e:
-        print("*** Bind failed: " + str(e))
-        traceback.print_exc()
-        sys.exit(1)
-
-    while True:
+    def run(self):
         try:
-            client, addr = sock.accept()
-        except Exception as e:
-            print("*** Listen/accept failed: " + str(e))
-            traceback.print_exc()
-            sys.exit(1)
-
-        print("Got a connection!")
-
-        try:
-            t = paramiko.Transport(client, gss_kex=DoGSSAPIKeyExchange)
+            t = paramiko.Transport(self.sock, gss_kex=True)
             t.set_gss_host(socket.getfqdn(""))
+            print("Got a connection!")
             try:
                 t.load_server_moduli()
             except:
@@ -168,6 +154,32 @@ def main():
                 pass
             sys.exit(1)
 
+def main():
+
+    # now connect
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("", 2200))
+        sock.listen(100)
+        print("Listening for connection ...")
+    except Exception as e:
+        print("*** Bind failed: " + str(e))
+        traceback.print_exc()
+        sys.exit(1)
+
+    threads = []
+
+    while True:
+        try:
+            (client_sock, (host, port)) = sock.accept()
+        except Exception as e:
+            print("*** Listen/accept failed: " + str(e))
+            traceback.print_exc()
+            sys.exit(1)
+        new_thread = Client_Thread(host, port, client_sock)
+        new_thread.start()
+        threads.append(new_thread)
 
 if __name__ == "__main__":
     main()
