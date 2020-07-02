@@ -14,11 +14,6 @@ except ImportError as e:
     os.system('clear')
     package_install("paramiko")
 
-# #Connect Info valuable
-# connect_username = None
-# connect_hostname = None
-# connect_hostport = None
-
 #Parser
 parser = argparse.ArgumentParser()
 parser.add_argument("server", help="connect server ip : 'username@addrhostnameess'", type=str)
@@ -52,30 +47,55 @@ class Prompt_sftp(Cmd):
     intro = "Welcome! sftp connect success~!!"
     prompt = 'custom_sftp> '
 
-    def __init__(self, connect_hostname, connect_username, connect_hostport, passwd):
+    def __init__(self, connect_hostname, connect_username, connect_hostport, passwd, pub_key):
         super().__init__() 
-        self.ssh = paramiko.SSHClient()
+        self.host = connect_hostname
+        self.user = connect_username
+        self.port = connect_hostport
 
+        self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         print("Hello~!. sftp excute.")
         print_connect_info(connect_hostname, connect_username, connect_hostport)
+
         try:
-            self.ssh.connect(connect_hostname, username=connect_username, password=passwd, port=connect_hostport)
+            self.ssh.connect(self.host , username=self.user , password=passwd, port=self.port )
+            self.channel = self.ssh.invoke_shell()
+            self.channel.send("mssg_00_connect")
+            print("[{}:{}] {}".format(self.host, self.port, self.channel.recv(65535).decode("utf-8")))
         except :
             print("Connect Fail!")
             exit()
-        
-        #set local_path
+
+        # set local_path
         self.cur_local_path = os.path.abspath('./')
 
-        #set remote_path
-        stdin, stdout, stderr = self.ssh.exec_command("pwd")
-        temp_remote_path = stdout.readlines()[0]
-        self.cur_remote_path = temp_remote_path[:temp_remote_path.find('\n')]
+        # # # set remote_path
+        self.channel.send("mssg_01_init_pwd")
+        recv_mssg = self.channel.recv(65535).decode("utf-8")
+        self.cur_remote_path = recv_mssg
 
     def do_test(self, args):
-        stdin, stdout, stderr = self.ssh.exec_command("pwd")
-        print(self.cur_remote_path)
+        self.channel.send("test!")
+        output = self.channel.recv(65535).decode("utf-8")
+        # print(output)
+
+    def do_test2(self, args):
+        self.channel.send("test2!")
+        output = self.channel.recv(65535).decode("utf-8")
+        print(output)
+
+    def do_put(self, args):
+        pass
+    
+    def help_put(self):
+        print("put [-afPpRr] local [remote] : Upload file")
+
+    def do_get(self, args):
+        pass
+
+    def help_get(self):
+        print("get [-afPpRr] remote [local] : Download file")
 
     def do_ls(self, args):
         flag = ''
@@ -88,19 +108,15 @@ class Prompt_sftp(Cmd):
             else : 
                 path = self.cur_remote_path + '/' + arg
 
-        stdin, stdout, stderr = self.ssh.exec_command("ls {} {}".format(flag, path))
-
+        self.channel.send("mssg_02_ls {} {}".format(path, flag))
+        recv_mssg = self.channel.recv(65535).decode("utf-8")
+        
         line_flag_list = "lgno1"
         if len(set(line_flag_list) - set(flag)) == len(set(line_flag_list)):
-            for e in stdout.readlines():
-                print(e[:e.find("\n")], end=' ')
-            print()
+            recv_mssg = recv_mssg.replace('\n', ' ')
+            print(recv_mssg)
         else :
-            for e in stdout.readlines():
-                print(e[:e.find("\n")])
-
-        for e in stderr.readlines():
-            print(e[:e.find("\n")])
+            print(recv_mssg)
 
     def help_ls(self):
         print("ls [-1afhlnrSt] [path] : Display remote directory listing")
@@ -112,16 +128,18 @@ class Prompt_sftp(Cmd):
         else : 
             path = self.cur_remote_path + '/' + arg
 
-        stdin, stdout, stderr = self.ssh.exec_command("cd {} && pwd".format(path))
-        update_path = stdout.readlines()[0]
-        update_path = update_path[:update_path.find('\n')]
-        self.cur_remote_path = update_path
+        # stdin, stdout, stderr = self.ssh.exec_command("cd {} && pwd".format(path))
+        # update_path = stdout.readlines()[0]
+
+        self.channel.send("mssg_03_cd {}".format(path))
+        recv_mssg = self.channel.recv(65535).decode("utf-8")
+        self.cur_remote_path = recv_mssg.replace('\n', ' ')
 
     def help_cd(self):
         print("cd path : Change remote directory to 'path'")
 
     def do_pwd(self, args):
-        print(self.cur_remote_path)
+        print("[Remote]",self.cur_remote_path)
 
     def help_pwd(self):
         print("pwd : Display remote working directory")
@@ -146,7 +164,7 @@ class Prompt_sftp(Cmd):
         print("lcd path : Change local directory to 'path'")
     
     def do_lpwd(self, arg):
-        print(self.cur_local_path)
+        print("[Local]",self.cur_local_path)
         
     def help_lpwd(self):
         print("lpwd : Print local working directory")
@@ -184,6 +202,7 @@ if __name__ == "__main__":
     arges = parser.parse_args()
     connect_username, connect_hostname = server_arg_check(arges.server)
     connect_hostport = arges.port
-    passwd = "12345"
+    pub_key = "./id_rsa.pub"
+    passwd = "1234"
 
-    Prompt_sftp(connect_hostname, connect_username, connect_hostport, passwd).cmdloop()
+    Prompt_sftp(connect_hostname, connect_username, connect_hostport, passwd, pub_key).cmdloop()
