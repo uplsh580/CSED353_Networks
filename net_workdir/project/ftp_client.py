@@ -67,6 +67,8 @@ class Prompt_sftp(Cmd):
             print("Connect Fail!")
             exit()
 
+        # self.ftp = paramiko.SFTPClient.from_transport(self.ssh.get_transport())
+
         # set local_path
         self.cur_local_path = os.path.abspath('./')
 
@@ -110,13 +112,15 @@ class Prompt_sftp(Cmd):
 
         self.channel.send("mssg_02_ls {} {}".format(path, flag))
         recv_mssg = self.channel.recv(65535).decode("utf-8")
-        
-        line_flag_list = "lgno1"
-        if len(set(line_flag_list) - set(flag)) == len(set(line_flag_list)):
-            recv_mssg = recv_mssg.replace('\n', ' ')
+        if recv_mssg[:5] == "ERROR" :
             print(recv_mssg)
-        else :
-            print(recv_mssg)
+        else:
+            line_flag_list = "lgno1"
+            if len(set(line_flag_list) - set(flag)) == len(set(line_flag_list)):
+                recv_mssg = recv_mssg.replace('\n', ' ')
+                print(recv_mssg)
+            else :
+                print(recv_mssg)
 
     def help_ls(self):
         print("ls [-1afhlnrSt] [path] : Display remote directory listing")
@@ -133,7 +137,10 @@ class Prompt_sftp(Cmd):
 
         self.channel.send("mssg_03_cd {}".format(path))
         recv_mssg = self.channel.recv(65535).decode("utf-8")
-        self.cur_remote_path = recv_mssg.replace('\n', ' ')
+        if recv_mssg[:5] == "ERROR" :
+            print(recv_mssg)
+        else:
+            self.cur_remote_path = recv_mssg.replace('\n', ' ')
 
     def help_cd(self):
         print("cd path : Change remote directory to 'path'")

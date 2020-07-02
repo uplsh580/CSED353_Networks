@@ -84,30 +84,39 @@ class Server(paramiko.ServerInterface):
     ):
         return True
 
-def request_handler(host, port, recv_mssg):
+def request_handler(chan, host, port, recv_mssg):
     if recv_mssg == 'mssg_00_connect':
         print("[{}:{}] {}".format(host, port, recv_mssg))
-        return 'Successful connection'
+        chan.send('Successful connection')
     
     elif recv_mssg == 'mssg_01_init_pwd':
         print("[{}:{}] {}".format(host, port, recv_mssg))
-        return os.path.abspath('./')
+        chan.send(os.path.abspath('./'))
 
     elif recv_mssg[:8] == 'mssg_02_':
-        print("[{}:{}] {}".format(host, port, recv_mssg))
-        commands = recv_mssg[8:].split()
-        reply = subprocess.check_output(commands)
-        if len(reply) == 0:
-            return " "
-        return reply
+        try:
+            print("[{}:{}] {}".format(host, port, recv_mssg))
+            commands = recv_mssg[8:].split()
+            reply = subprocess.check_output(commands)
+            if len(reply) == 0:
+                chan.send(" ")
+            else:
+                chan.send(reply)
+        except:
+            chan.send("ERROR: No path")
+
 
     elif recv_mssg[:8] == 'mssg_03_':
-        print("[{}:{}] {}".format(host, port, recv_mssg))
-        reply = os.path.abspath(recv_mssg[11:])
-        return reply
+        try :
+            print("[{}:{}] {}".format(host, port, recv_mssg))
+            reply = os.path.abspath(recv_mssg[11:])
+            subprocess.check_output(['ls', reply]) 
+            chan.send(reply)
+        except:
+            chan.send("ERROR: No path")
 
     else :
-        return "wow"
+        chan.send("wow")
 
 class Client_Thread(Thread):
     def __init__(self, host, port, sock):
@@ -151,8 +160,8 @@ class Client_Thread(Thread):
                         # sys.exit(1)
                     
                     recv_mssg = chan.recv(65535).decode("utf-8")
-                    reply_mssg = request_handler(self.host, self.port, recv_mssg)
-                    chan.send(reply_mssg)
+                    reply_mssg = request_handler(chan, self.host, self.port, recv_mssg)
+                    # chan.send(reply_mssg)
                 except OSError:
                     print("[{}:{}] Socket is closed".format(self.host, self.port))
                     break
