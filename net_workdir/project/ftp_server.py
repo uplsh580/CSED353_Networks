@@ -9,7 +9,7 @@ import traceback
 import paramiko
 from paramiko.py3compat import b, u, decodebytes
 from threading import Thread
-
+import subprocess
 
 # setup logging
 paramiko.util.log_to_file("demo_server.log")
@@ -84,13 +84,28 @@ class Server(paramiko.ServerInterface):
     ):
         return True
 
-def request_handler(recv_mssg):
-    if recv_mssg == 'pwd\n':
+def request_handler(host, port, recv_mssg):
+    if recv_mssg == 'mssg_00_connect':
+        print("[{}:{}] {}".format(host, port, recv_mssg))
+        return 'Successful connection'
+    
+    elif recv_mssg == 'mssg_01_init_pwd':
+        print("[{}:{}] {}".format(host, port, recv_mssg))
         return os.path.abspath('./')
-    elif recv_mssg == 'Connect!':
-        return 'Good!Good!'
-    elif recv_mssg == 'test2!':
-        return "wow2"
+
+    elif recv_mssg[:8] == 'mssg_02_':
+        print("[{}:{}] {}".format(host, port, recv_mssg))
+        commands = recv_mssg[8:].split()
+        reply = subprocess.check_output(commands)
+        if len(reply) == 0:
+            return " "
+        return reply
+
+    elif recv_mssg[:8] == 'mssg_03_':
+        print("[{}:{}] {}".format(host, port, recv_mssg))
+        reply = os.path.abspath(recv_mssg[11:])
+        return reply
+
     else :
         return "wow"
 
@@ -136,12 +151,10 @@ class Client_Thread(Thread):
                         # sys.exit(1)
                     
                     recv_mssg = chan.recv(65535).decode("utf-8")
-                    print(recv_mssg)
-                    reply_mssg = request_handler(recv_mssg)
-                    print(reply_mssg)
+                    reply_mssg = request_handler(self.host, self.port, recv_mssg)
                     chan.send(reply_mssg)
                 except OSError:
-                    print("Socket is closed")
+                    print("[{}:{}] Socket is closed".format(self.host, self.port))
                     break
             chan.close()
 
