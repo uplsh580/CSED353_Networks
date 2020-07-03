@@ -5,21 +5,48 @@ import socket
 import sys
 import threading
 import traceback
-
-import paramiko
-from paramiko import ServerInterface, SFTPServerInterface, SFTPServer, SFTPAttributes, \
-    SFTPHandle, SFTP_OK, AUTH_SUCCESSFUL, OPEN_SUCCEEDED
-from paramiko.py3compat import b, u, decodebytes
 from threading import Thread
 import subprocess
 import random as rd
 import time
 
-# setup logging
-paramiko.util.log_to_file("demo_server.log")
-
+#TODO: Set your INFO
+BIND_PORT = 2200
+CUSTOM_USER_NAME = 'root'
+CUSTOM_PASSWD = '1234'
 key_filename = "id_rsa"
-host_key = paramiko.RSAKey(filename=key_filename)
+
+def package_install(package):
+    while (1):
+        print("This program needs [{}] package.".format(package))
+        reply = input("Is it okay to install [{}] package? (y/n) : ".format(package))
+        if reply == 'y':
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+            time.sleep(1)
+            return True
+        elif reply == 'n':
+            print("Quit program.")
+            exit()
+
+#Check paramiko package
+try:
+    import paramiko
+    from paramiko.py3compat import b, u, decodebytes
+    from paramiko import ServerInterface, SFTPServerInterface, SFTPServer, SFTPAttributes, \
+    SFTPHandle, SFTP_OK, AUTH_SUCCESSFUL, OPEN_SUCCEEDED
+except ImportError as e:
+    os.system('clear')
+    package_install("paramiko")
+    import paramiko
+    from paramiko.py3compat import b, u, decodebytes
+    from paramiko import ServerInterface, SFTPServerInterface, SFTPServer, SFTPAttributes, \
+    SFTPHandle, SFTP_OK, AUTH_SUCCESSFUL, OPEN_SUCCEEDED
+
+try : 
+    host_key = paramiko.RSAKey(filename=key_filename)
+except:
+    print('[Error] ({}) is wrong key path.'.format(key_filename))
+    exit()
 
 def new_port():
     retry = 1000
@@ -221,7 +248,7 @@ class StubSFTPServer (SFTPServerInterface):
 
 
 class Server(paramiko.ServerInterface):
-    good_pub_key = paramiko.RSAKey(filename=sys.argv[1])
+    good_pub_key = paramiko.RSAKey(filename=key_filename)
 
     def __init__(self):
         self.event = threading.Event()
@@ -232,32 +259,19 @@ class Server(paramiko.ServerInterface):
         return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
     def check_auth_password(self, username, password):
-        if (username == "root") and (password == "1234"):
+        if (username == CUSTOM_USER_NAME) and (password == CUSTOM_PASSWD):
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
 
     def check_auth_publickey(self, username, key):
         print("Auth attempt with key: " + u(hexlify(key.get_fingerprint())))
-        if (username == "root") and (key == self.good_pub_key):
+        if (username == CUSTOM_USER_NAME) and (key == self.good_pub_key):
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
 
     def check_auth_gssapi_with_mic(
         self, username, gss_authenticated=paramiko.AUTH_FAILED, cc_file=None
     ):
-        """
-        .. note::
-            We are just checking in `AuthHandler` that the given user is a
-            valid krb5 principal! We don't check if the krb5 principal is
-            allowed to log in on the server, because there is no way to do that
-            in python. So if you develop your own SSH server with paramiko for
-            a certain platform like Linux, you should call ``krb5_kuserok()`` in
-            your local kerberos library to make sure that the krb5_principal
-            has an account on the server and is allowed to log in as a user.
-        .. seealso::
-            `krb5_kuserok() man page
-            <http://www.unix.com/man-page/all/3/krb5_kuserok/>`_
-        """
         if gss_authenticated == paramiko.AUTH_SUCCESSFUL:
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
@@ -291,7 +305,7 @@ def sftp_server(chan, host, port, keyfile, level='INFO'):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
     server_socket.bind((host, port))
-    server_socket.listen(100)
+    server_socket.listen(200)
     chan.send("mssg_05_{}".format(port))
 
     conn, addr = server_socket.accept()
@@ -396,11 +410,9 @@ class Client_Thread(Thread):
                     if not server.event.is_set():
                         print("*** Client never asked for a shell.")
                         break
-                        # sys.exit(1)
                     
                     recv_mssg = chan.recv(65535).decode("utf-8")
                     reply_mssg = request_handler(chan, self.host, self.port, key_filename, recv_mssg)
-                    # chan.send(reply_mssg)
                 except OSError:
                     print("[{}:{}] Socket is closed".format(self.host, self.port))
                     break
@@ -421,8 +433,8 @@ def main():
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("", 2200))
-        sock.listen(100)
+        sock.bind(("", BIND_PORT))
+        sock.listen(200)
         print("Listening for connection ...")
     except Exception as e:
         print("*** Bind failed: " + str(e))
