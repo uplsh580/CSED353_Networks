@@ -6,7 +6,7 @@ from cmd import Cmd
 import subprocess
 import sys
 import time
-
+import getpass
 #Check paramiko package
 try:
     import paramiko
@@ -47,11 +47,13 @@ class Prompt_sftp(Cmd):
     intro = "Welcome! sftp connect success~!!"
     prompt = 'custom_sftp> '
 
-    def __init__(self, connect_hostname, connect_username, connect_hostport, passwd, pub_key):
+    def __init__(self, connect_hostname, connect_username, connect_hostport, passwd, keyfilepath):
         super().__init__() 
         self.host = connect_hostname
         self.user = connect_username
         self.port = connect_hostport
+        self.passwd = passwd
+        self.key_filename = keyfilepath
 
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -59,7 +61,7 @@ class Prompt_sftp(Cmd):
         print_connect_info(connect_hostname, connect_username, connect_hostport)
 
         try:
-            self.ssh.connect(self.host , username=self.user , password=passwd, port=self.port )
+            self.ssh.connect(self.host , username=self.user , password=passwd, port=self.port)
             self.channel = self.ssh.invoke_shell()
             self.channel.send("mssg_00_connect")
             print("[{}:{}] {}".format(self.host, self.port, self.channel.recv(65535).decode("utf-8")))
@@ -67,34 +69,206 @@ class Prompt_sftp(Cmd):
             print("Connect Fail!")
             exit()
 
-        # self.ftp = paramiko.SFTPClient.from_transport(self.ssh.get_transport())
-
         # set local_path
         self.cur_local_path = os.path.abspath('./')
 
-        # # # set remote_path
+        # set remote_path
         self.channel.send("mssg_01_init_pwd")
         recv_mssg = self.channel.recv(65535).decode("utf-8")
         self.cur_remote_path = recv_mssg
 
-    def do_test(self, args):
-        self.channel.send("test!")
-        output = self.channel.recv(65535).decode("utf-8")
-        # print(output)
+        self.init_remote_path = self.cur_remote_path
 
-    def do_test2(self, args):
-        self.channel.send("test2!")
-        output = self.channel.recv(65535).decode("utf-8")
-        print(output)
+    def do_test(self, args):
+        args_list = list(parse(args))
+        flag = ''
+        try :
+            if args_list[0][0] == "-":
+                flag = args_list[0]
+                file_name = args_list[1].split('/')[-1]
+                print(file_name)
+                src_path = abs_path(self.cur_local_path, input_path = args_list[1])
+                print(src_path)
+
+                if len(args_list) == 3:
+                    if args_list[2][0] == '/' or args_list[2][0] == '~': 
+                        dst_path = args_list[2] + '/' + file_name
+                    else : 
+                        dst_path = self.cur_remote_path + '/' + args_list[2]
+                        if dst_path[-1] == '/':
+                            dst_path += file_name
+                        else: 
+                            dst_path += '/' + file_name
+                else:
+                    dst_path = self.cur_remote_path
+                    if dst_path[-1] == '/':
+                        dst_path += file_name
+                    else: 
+                        dst_path += '/' + file_name
+                        
+                print(dst_path)
+        except:
+            print("Something Wrong")
 
     def do_put(self, args):
-        pass
-    
+        self.channel.send("mssg_04_pg")
+        recv_mssg = self.channel.recv(65535).decode("utf-8")
+        p = int(recv_mssg.replace('mssg_05_', ''))
+        
+        f_ssh = paramiko.SSHClient()
+        f_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        f_ssh.connect(self.host, username=self.user, password=self.passwd, port=p, key_filename=self.key_filename)
+        self.channel = self.ssh.invoke_shell()
+        sftp = f_ssh.open_sftp()
+        
+        # try:
+        args_list = list(parse(args))
+        flag = ''
+        if args_list[0][0] == "-":
+            flag = args_list[0]
+            file_name = args_list[1].split('/')[-1]
+            print(file_name)
+            src_path = abs_path(self.cur_local_path, input_path = args_list[1])
+            print(src_path)
+
+            if len(args_list) == 3:
+                if args_list[2][0] == '/' or args_list[2][0] == '~': 
+                    dst_path = args_list[2] + '/' + file_name
+                else : 
+                    dst_path = self.cur_remote_path + '/' + args_list[2]
+                    if dst_path[-1] == '/':
+                        dst_path += file_name
+                    else: 
+                        dst_path += '/' + file_name
+            else:
+                dst_path = self.cur_remote_path
+                if dst_path[-1] == '/':
+                    dst_path += file_name
+                else: 
+                    dst_path += '/' + file_name
+        else :
+            file_name = args_list[0].split('/')[-1]
+            print(file_name)
+            src_path = abs_path(self.cur_local_path, input_path = args_list[0])
+            print(src_path)
+
+            if len(args_list) == 2:
+                if args_list[1][0] == '/' or args_list[1][0] == '~': 
+                    dst_path = args_list[1] + '/' + file_name
+                else : 
+                    dst_path = self.cur_remote_path + '/' + args_list[2]
+                    if dst_path[-1] == '/':
+                        dst_path += file_name
+                    else: 
+                        dst_path += '/' + file_name
+            else:
+                dst_path = self.cur_remote_path
+                if dst_path[-1] == '/':
+                    dst_path += file_name
+                else: 
+                    dst_path += '/' + file_name
+                    
+        print(dst_path)
+        if dst_path[:len(self.init_remote_path)] == self.init_remote_path:
+            if dst_path[len(self.init_remote_path)] == '/':
+                dst_path = '.' + dst_path[len(self.init_remote_path):]
+            else:
+                dst_path = './' + dst_path[len(self.init_remote_path):]
+        print("[Local] {} -> [Remote] {}".format(src_path, dst_path))
+        try:
+            sftp.put(src_path, remotepath=dst_path)
+        except FileNotFoundError:
+            print("No such file")
+        except OSError:
+            print("No such file")
+        sftp.close()
+        f_ssh.close()
+        # except:
+        #     print("Something Wrong")
+
+        
+
+        self.ssh.connect(self.host , username=self.user , password=self.passwd, port=self.port)
+        self.channel = self.ssh.invoke_shell()
+
     def help_put(self):
         print("put [-afPpRr] local [remote] : Upload file")
 
     def do_get(self, args):
-        pass
+        self.channel.send("mssg_04_pg")
+        recv_mssg = self.channel.recv(65535).decode("utf-8")
+        print(recv_mssg)
+        p = int(recv_mssg.replace('mssg_05_', ''))
+        
+        f_ssh = paramiko.SSHClient()
+        f_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        f_ssh.connect(self.host, username=self.user, password=self.passwd, port=p, key_filename=self.key_filename)
+        self.channel = self.ssh.invoke_shell()
+        sftp = f_ssh.open_sftp()
+        
+        args_list = list(parse(args))
+        print(args_list)
+        # try:
+        flag = ''
+        if args_list[0][0] == "-":
+            flag = args_list[0]
+            file_name = args_list[1].split('/')[-1]
+            print(file_name)
+            src_path = self.cur_remote_path 
+            if args_list[1][0] == '/' or args_list[1][0] == '~': 
+                src_path = args_list[1]
+            else : 
+                if src_path[-1] == '/':
+                    src_path += args_list[1]
+                else:
+                    src_path += '/' + args_list[1]
+            
+            print(src_path)
+
+            if len(args_list) == 3:
+                dst_path = abs_path(self.cur_local_path, input_path = args_list[2]+ file_name)
+            else:
+                dst_path = abs_path(self.cur_local_path, input_path = file_name)
+        else :
+            file_name = args_list[0].split('/')[-1]
+            print(file_name)
+            src_path = self.cur_remote_path 
+            if args_list[0][0] == '/' or args_list[0][0] == '~': 
+                src_path = args_list[1]
+            else : 
+                if src_path[-1] == '/':
+                    src_path += args_list[0]
+                else:
+                    src_path += '/' + args_list[0]
+            
+            print(src_path)
+
+            if len(args_list) == 2:
+                dst_path = abs_path(self.cur_local_path, input_path = args_list[1]+ file_name)
+            else:
+                dst_path = abs_path(self.cur_local_path, input_path = file_name)
+                    
+        print(dst_path)
+        # dst_path = '/root/test.txt'
+        if src_path[:len(self.init_remote_path)] == self.init_remote_path:
+            if src_path[len(self.init_remote_path)] == '/':
+                src_path = '.' + src_path[len(self.init_remote_path):]
+            else:
+                src_path = './' + src_path[len(self.init_remote_path):]
+        print("[Remote] {} -> [Local] {}".format(src_path, dst_path))
+        try:
+            sftp.get(src_path, dst_path)
+        except FileNotFoundError:
+            print("No such file")
+        except OSError:
+            print("No such file")
+        sftp.close()
+        f_ssh.close()
+        # except:
+        #     print("Something Wrong")
+
+        self.ssh.connect(self.host , username=self.user , password=self.passwd, port=self.port)
+        self.channel = self.ssh.invoke_shell()
 
     def help_get(self):
         print("get [-afPpRr] remote [local] : Download file")
@@ -127,7 +301,9 @@ class Prompt_sftp(Cmd):
 
     def do_cd(self, arg):
         path = self.cur_remote_path
-        if arg[0] == '/' or arg[0] == '~': 
+        if arg == '':
+            path = ''
+        elif arg[0] == '/' or arg[0] == '~': 
             path = arg
         else : 
             path = self.cur_remote_path + '/' + arg
@@ -202,14 +378,12 @@ def print_connect_info(connect_username, connect_hostname, connect_hostport):
 
 
 if __name__ == "__main__":
-
-
     #Start Program
+    passwd = getpass.getpass()
     os.system('clear')
     arges = parser.parse_args()
     connect_username, connect_hostname = server_arg_check(arges.server)
     connect_hostport = arges.port
-    pub_key = "./id_rsa.pub"
-    passwd = "1234"
+    pub_key = "./id_rsa"
 
     Prompt_sftp(connect_hostname, connect_username, connect_hostport, passwd, pub_key).cmdloop()
